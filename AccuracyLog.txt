@@ -1,0 +1,32 @@
+Use this file as a log for the final epoch of the NN.
+Include the init and forward methods of the AudioCNN class for recording purposes.
+
+LOG 1: (Aidan)
+Running loss for epoch 15: 4.6336
+Accuracy on test set: 0.9663
+
+    def __init__(self, num_classes):
+        super(AudioCNN, self).__init__()
+
+        self.in_to_h1 = nn.Conv2d(1, 16, kernel_size=(3, 3), padding=(1, 1))
+        self.norm = nn.BatchNorm2d(16)
+
+        self.h1_to_h2 = nn.Conv2d(16, 32, kernel_size=(3, 3), padding=(1, 1))
+
+        self.h2_to_h3 = nn.Linear(32 * 16 * 16, 128)
+        self.h3_to_out = nn.Linear(128, num_classes)
+
+    def forward(self, x):
+        x = self.in_to_h1(x)
+        x = F.relu(self.norm(x))
+        x = F.max_pool2d(x, (2, 2))
+        x = F.relu(self.h1_to_h2(x))
+        x = F.max_pool2d(x, (2, 2))
+
+        x = torch.flatten(x, 1)
+        x = F.relu(self.h2_to_h3(x))
+        x = F.dropout(x, 0.1)
+        x = self.h3_to_out(x)
+
+        return x
+

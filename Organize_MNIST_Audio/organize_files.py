@@ -4,7 +4,7 @@ import shutil
 # Adjust these paths based on where your dataset currently is
 
 #https://www.kaggle.com/datasets/sripaadsrinivasan/audio-mnist/data
-SOURCE_DIR = r"" #ENTER THE DIRECTORY OF YOUR MNIST AUDIO FILES FROM HERE
+SOURCE_DIR = r"" #ENTER THE DIRECTORY OF YOUR MNIST AUDIO FILES FROM HERE (C:\Users\USER\...\mnist_audio\data)
 DEST_TRAIN = "MNIST_Audio_Train"
 DEST_TEST = "MNIST_Audio_Test"
 
