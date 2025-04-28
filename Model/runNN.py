@@ -8,9 +8,11 @@ import torchaudio
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 
-TRAIN_AUDIO_DIR = "Organize_MNIST_Audio/MNIST_Audio_Train"
-TEST_AUDIO_DIR = "Organize_MNIST_Audio/MNIST_Audio_Test"
+
+TRAIN_AUDIO_DIR = "../Organize_MNIST_Audio/MNIST_Audio_Train"
+TEST_AUDIO_DIR = "../Organize_MNIST_Audio/MNIST_Audio_Test"
 SR = 8000
 N_MELS = 64
 TARGET_LENGTH = 6700
@@ -61,15 +63,22 @@ def trainNN(epochs=15, batch_size=16, lr=0.001, display_test_acc=False, save_fil
         db_transform=db_transform
     )
 
+    transform.training = True  # augmentation ON for train set
+
     # Load dataset with normalization
     train_dataset = AudioMNISTDataset(TRAIN_AUDIO_DIR, transform=transform)
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,   num_workers=os.cpu_count() or 4 , pin_memory=True, persistent_workers=True)
+    # num_workers: splits up data processing between cpu cores
+    # pin_memory=True: use page‐locked (pinned) host memory to speed up .to(device) transfers
+    # drop_last=True: if data size % batch size != 0, drop the last batch to keep all batches the same size. Never happens with batch size 8,16,32
+    # persistent_workers=True: Epoch 1 takes awhile to start because the workers have to be created, this allows workers to transfer between epochs greatly decreasing runtime.
 
     test_loader = None
 
     if display_test_acc:
+        transform.training = False
         test_dataset = AudioMNISTDataset(TEST_AUDIO_DIR, transform=transform)
-        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False,  num_workers=os.cpu_count() or 4, pin_memory=True, persistent_workers=True)
 
     # Model, optimizer, etc.
     model = AudioCNN(num_classes=10).to(device)
@@ -100,6 +109,8 @@ def trainNN(epochs=15, batch_size=16, lr=0.001, display_test_acc=False, save_fil
 
             running_loss += loss.item()
         print(f"Running loss for epoch {epoch + 1}: {running_loss:.4f}")
+        #print(f"Epoch {epoch + 1}: applied SpecAugment {transform.mask_count} times")
+        transform.mask_count = 0
         running_loss = 0.0
         if display_test_acc:
             accuracy(model, test_loader, device)
@@ -119,6 +130,7 @@ def run_trained_network(trained_network="MNIST_Audio_CNN.pt", batch_size=16):
     )
     db_transform = T.AmplitudeToDB()
     transform = AudioTransform(SR, TARGET_LENGTH, mel_transform, db_transform)
+    transform.training = False
 
     # Load test set
     test_dataset = AudioMNISTDataset(TEST_AUDIO_DIR, transform=transform)
@@ -133,7 +145,7 @@ def run_trained_network(trained_network="MNIST_Audio_CNN.pt", batch_size=16):
 
     # Confusion matrix
     cm = confusion_matrix(labels, preds)
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=np.arange(1,11))
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=np.arange(0,10)) #displays 0-9 instead of 1-10
     disp.plot()
     plt.title("Confusion Matrix")
     plt.show()
@@ -146,6 +158,7 @@ def classify_wav_file(file_path, trained_network="MNIST_Audio_CNN.pt"):
                                      n_mels=N_MELS, center=False)
     db_transform = T.AmplitudeToDB()
     transform = AudioTransform(SR, TARGET_LENGTH, mel_transform, db_transform)
+    transform.training = False
 
     # Load the model
     model = AudioCNN(num_classes=10).to(device)
@@ -166,9 +179,11 @@ def classify_wav_file(file_path, trained_network="MNIST_Audio_CNN.pt"):
     return predicted_class
 
 if __name__ == "__main__":
-    # trainNN(batch_size=32, display_test_acc=False)
-    # run_trained_network(batch_size=32)
+    trainNN(batch_size=32, display_test_acc=True)
+    run_trained_network(batch_size=32)
 
+
+    #for i in range(0,99):
     num = np.random.randint(0, 10)
     person = np.random.randint(55, 61)
     take = np.random.randint(0, 50)

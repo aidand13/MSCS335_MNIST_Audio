@@ -12,12 +12,24 @@ import torchaudio as ta
 import matplotlib.pyplot as plt
 
 AUDIO_DIR = "MNIST_Audio_Train"  # or MNIST_Audio_Test
-NUM_TO_SHOW = 5
+
+# Mel parameters
 SR = 8000
 N_MELS = 64
-TARGET_LENGTH = 6700
 HOP_LENGTH = 100
 N_FFT = 400
+
+# Padding length
+TARGET_LENGTH = 6700
+
+# Testing amount
+NUM_TO_SHOW = 5
+
+n_frames = (TARGET_LENGTH - N_FFT) // HOP_LENGTH + 1
+time_mask_param = int(n_frames * 0.15)  # ~9 frames (~0.12 s)
+freq_mask_param = int(N_MELS * 0.15)   # ~10 bins
+
+
 
 mel_transform = T.MelSpectrogram(
     sample_rate=SR,

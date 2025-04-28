@@ -5,13 +5,20 @@ from torch.utils.data import Dataset
 import os
 import torchaudio
 import torchaudio.transforms as T
+import random
 
 class AudioTransform:
-    def __init__(self, sr, target_length, mel_transform, db_transform):
+    def __init__(self, sr, target_length, mel_transform, db_transform, time_mask_param=9,freq_mask_param=10):
         self.sr = sr
         self.target_length = target_length
         self.mel_transform = mel_transform
         self.db_transform = db_transform
+
+        self.time_mask = T.TimeMasking(time_mask_param=time_mask_param)
+        self.freq_mask = T.FrequencyMasking(freq_mask_param=freq_mask_param)
+
+        self.training = False
+        #self.mask_count = 0
 
     def __call__(self, waveform, orig_sr):
         # Resample if needed
@@ -36,6 +43,12 @@ class AudioTransform:
         # Mel spectrogram + dB
         mel = self.mel_transform(waveform)
         mel_db = self.db_transform(mel)
+
+        if self.training and random.random() < 0.5:
+            #self.mask_count += 1
+
+            mel_db = self.time_mask(mel_db)
+            mel_db = self.freq_mask(mel_db)
 
         return mel_db
 
