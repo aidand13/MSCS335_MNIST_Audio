@@ -71,14 +71,15 @@ def plot_spec(mel_db_):
     plt.tight_layout()
     plt.show()
 
-# Grab first few .wav files
-wav_files = [f for f in os.listdir(AUDIO_DIR) if f.endswith(".wav")][:NUM_TO_SHOW]
+if __name__ == "__main__":
+    # Grab first few .wav files
+    wav_files = [f for f in os.listdir(AUDIO_DIR) if f.endswith(".wav")][:NUM_TO_SHOW]
 
-for fname in wav_files:
-    path = os.path.join(AUDIO_DIR, fname)
-    mel_spec = process_audio(path)
-    print(mel_spec.shape)
-    mel_db = db_transform(mel_spec)
+    for fname in wav_files:
+        path = os.path.join(AUDIO_DIR, fname)
+        mel_spec = process_audio(path)
+        print(mel_spec.shape)
+        mel_db = db_transform(mel_spec)
 
-    plot_spec(mel_db)
+        plot_spec(mel_db)
 

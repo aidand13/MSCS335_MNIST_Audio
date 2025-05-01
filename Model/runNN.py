@@ -1,4 +1,6 @@
 from MNIST_Audio_CNN import AudioCNN, AudioMNISTDataset, AudioTransform
+from input_to_wav import get_user_input
+from visualize import plot_spec, process_audio
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
@@ -10,7 +12,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-
 TRAIN_AUDIO_DIR = "../Organize_MNIST_Audio/MNIST_Audio_Train"
 TEST_AUDIO_DIR = "../Organize_MNIST_Audio/MNIST_Audio_Test"
 SR = 8000
@@ -18,6 +19,16 @@ N_MELS = 64
 TARGET_LENGTH = 6700
 HOP_LENGTH = 100
 N_FFT = 400
+
+MEL_TRANSFORM = T.MelSpectrogram(
+        sample_rate=SR,
+        n_fft=N_FFT,
+        hop_length=HOP_LENGTH,
+        n_mels=N_MELS,
+        center=False
+    )
+
+DB_TRANSFORM = T.AmplitudeToDB()
 
 def accuracy(model, test_loader_, device):
     model.eval()
@@ -46,28 +57,19 @@ def trainNN(epochs=15, batch_size=16, lr=0.001, display_test_acc=False, save_fil
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    mel_transform = T.MelSpectrogram(
-        sample_rate=SR,
-        n_fft=N_FFT,
-        hop_length=HOP_LENGTH,
-        n_mels=N_MELS,
-        center=False
-    )
-
-    db_transform = T.AmplitudeToDB()
-
     transform = AudioTransform(
         sr=SR,
         target_length=TARGET_LENGTH,
-        mel_transform=mel_transform,
-        db_transform=db_transform
+        mel_transform=MEL_TRANSFORM,
+        db_transform=DB_TRANSFORM
     )
 
     transform.training = True  # augmentation ON for train set
 
     # Load dataset with normalization
     train_dataset = AudioMNISTDataset(TRAIN_AUDIO_DIR, transform=transform)
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,   num_workers=os.cpu_count() or 4 , pin_memory=True, persistent_workers=True)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=os.cpu_count() or 4,
+                              pin_memory=True, persistent_workers=True)
     # num_workers: splits up data processing between cpu cores
     # pin_memory=True: use page‐locked (pinned) host memory to speed up .to(device) transfers
     # drop_last=True: if data size % batch size != 0, drop the last batch to keep all batches the same size. Never happens with batch size 8,16,32
@@ -78,7 +80,14 @@ def trainNN(epochs=15, batch_size=16, lr=0.001, display_test_acc=False, save_fil
     if display_test_acc:
         transform.training = False
         test_dataset = AudioMNISTDataset(TEST_AUDIO_DIR, transform=transform)
-        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False,  num_workers=os.cpu_count() or 4, pin_memory=True, persistent_workers=True)
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=os.cpu_count() or 4,
+                                 pin_memory=True, persistent_workers=True)
+
+    test_loader = None
+
+    if display_test_acc:
+        test_dataset = AudioMNISTDataset(TEST_AUDIO_DIR, transform=transform)
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     # Model, optimizer, etc.
     model = AudioCNN(num_classes=10).to(device)
@@ -109,32 +118,21 @@ def trainNN(epochs=15, batch_size=16, lr=0.001, display_test_acc=False, save_fil
 
             running_loss += loss.item()
         print(f"Running loss for epoch {epoch + 1}: {running_loss:.4f}")
-        #print(f"Epoch {epoch + 1}: applied SpecAugment {transform.mask_count} times")
-        transform.mask_count = 0
         running_loss = 0.0
         if display_test_acc:
             accuracy(model, test_loader, device)
 
     torch.save(model.state_dict(), save_file)
 
-def run_trained_network(trained_network="MNIST_Audio_CNN.pt", batch_size=16):
+def run_trained_network(trained_network="MNIST_Audio_CNN.pt", batch_size=32, save_matrix=False):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Define transforms
-    mel_transform = T.MelSpectrogram(
-        sample_rate=SR,
-        n_fft=N_FFT,
-        hop_length=HOP_LENGTH,
-        n_mels=N_MELS,
-        center=False
-    )
-    db_transform = T.AmplitudeToDB()
-    transform = AudioTransform(SR, TARGET_LENGTH, mel_transform, db_transform)
+    transform = AudioTransform(SR, TARGET_LENGTH, MEL_TRANSFORM, DB_TRANSFORM)
     transform.training = False
 
     # Load test set
     test_dataset = AudioMNISTDataset(TEST_AUDIO_DIR, transform=transform)
-    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     # Load model
     model = AudioCNN(num_classes=10).to(device)
@@ -145,20 +143,17 @@ def run_trained_network(trained_network="MNIST_Audio_CNN.pt", batch_size=16):
 
     # Confusion matrix
     cm = confusion_matrix(labels, preds)
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=np.arange(0,10)) #displays 0-9 instead of 1-10
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=np.arange(0,10))
     disp.plot()
     plt.title("Confusion Matrix")
+    if save_matrix:
+        plt.savefig('MNIST_Audio_Matrix.png')
     plt.show()
 
 def classify_wav_file(file_path, trained_network="MNIST_Audio_CNN.pt"):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Define transforms (same as training)
-    mel_transform = T.MelSpectrogram(sample_rate=SR, n_fft=N_FFT, hop_length=HOP_LENGTH,
-                                     n_mels=N_MELS, center=False)
-    db_transform = T.AmplitudeToDB()
-    transform = AudioTransform(SR, TARGET_LENGTH, mel_transform, db_transform)
-    transform.training = False
+    transform = AudioTransform(SR, TARGET_LENGTH, MEL_TRANSFORM, DB_TRANSFORM)
 
     # Load the model
     model = AudioCNN(num_classes=10).to(device)
@@ -167,29 +162,31 @@ def classify_wav_file(file_path, trained_network="MNIST_Audio_CNN.pt"):
 
     # Load and preprocess audio
     waveform, sr = torchaudio.load(file_path)
-    mel_db = transform(waveform, sr)
-    mel_db = mel_db.unsqueeze(0).to(device)  # Add batch dim and move to device
+    mel_db_ = transform(waveform, sr)
+    mel_db_ = mel_db_.unsqueeze(0).to(device)  # Add batch dim and move to device
 
     # Classify
     with torch.no_grad():
-        output = model(mel_db)
+        output = model(mel_db_)
         predicted_class = torch.argmax(output, dim=1).item()
 
-    # print(f"Predicted class: {predicted_class}")
     return predicted_class
 
 if __name__ == "__main__":
-    trainNN(batch_size=32, display_test_acc=True)
-    run_trained_network(batch_size=32)
+    print("1. Train CNN\t2. Test CNN\n3. Get and Classify User Input\t4. Test Output File")
+    num = int(input("Select an option:\n"))
+    if num==1:
+        trainNN(batch_size=32, display_test_acc=True)
+    elif num==2:
+        run_trained_network(batch_size=32, save_matrix=True)
+    elif num==3:
+        get_user_input()
 
-
-    #for i in range(0,99):
-    num = np.random.randint(0, 10)
-    person = np.random.randint(55, 61)
-    take = np.random.randint(0, 50)
-
-    filename = f"../Organize_MNIST_Audio/MNIST_Audio_Test/{num}_{person}_{take}.wav"
-
-    print(f"Classifying: {num}_{person}_{take}.wav")
-    pred = classify_wav_file(filename)
-    print(f"{num}:{pred}")
+    if num==3 or num==4:
+        pred = classify_wav_file("output.wav")
+        print("Enter the number you spoke:")
+        num = input()
+        print(f"Actual: {num}\tPredicted: {pred}")
+        db_transform=T.AmplitudeToDB()
+        mel_db=db_transform(process_audio("output.wav"))
+        plot_spec(mel_db)
