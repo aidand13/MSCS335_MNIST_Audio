@@ -11,7 +11,7 @@ import torchaudio.transforms as T
 import torchaudio as ta
 import matplotlib.pyplot as plt
 
-AUDIO_DIR = "MNIST_Audio_Train"  # or MNIST_Audio_Test
+AUDIO_DIR = "../Organize_MNIST_Audio/MNIST_Audio_Train"  # or MNIST_Audio_Test
 
 # Mel parameters
 SR = 8000

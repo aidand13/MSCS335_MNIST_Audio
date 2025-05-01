@@ -16,17 +16,15 @@ def record_audio():
     return audio_.flatten()
 
 
-def trim_to_voiced(audio_, sr, target_duration=0.8):
+def trim_to_voiced(audio_, sr, target_length=6700):
     audio_ = audio_.astype(np.float32) / 32768.0
     # Remove silence
     trimmed, _ = librosa.effects.trim(audio_, top_db=30)
 
-    # Limit to 0.8s of voiced audio
-    max_len = int(sr * target_duration)
-    if len(trimmed) > max_len:
-        trimmed = trimmed[:max_len]
+    if len(trimmed) > target_length:
+        trimmed = trimmed[:target_length]
     else:
-        trimmed = np.pad(trimmed, (0, max_len - len(trimmed)), mode='constant')
+        trimmed = np.pad(trimmed, (0, target_length - len(trimmed)), mode='constant')
 
     trimmed = (trimmed * 32767).astype(np.int16)
     return trimmed
